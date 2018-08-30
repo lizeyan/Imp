@@ -163,20 +163,6 @@ def timeSince(since, percent):
     return '%s (- %s)' % (asMinutes(s), asMinutes(rs))
 
 
-def showPlot(points):
-    plt.figure()
-    fig, ax = plt.subplots()
-    # this locator puts ticks at regular intervals
-    loc = ticker.MultipleLocator(base=0.2)
-    ax.yaxis.set_major_locator(loc)
-    plt.plot(points)
-    vis = visdom.Visdom(server=VISDOM_SERVER, port=VISDOM_PORT, env="Eng-Fra NMT")
-    vis.matplot(fig,
-                opts=dict(title="seq2seq"),
-                win="seq2seq")
-    plt.close("all")
-
-
 def evaluate(_encoder, _decoder, sentence, max_length=MAX_LENGTH):
     with torch.no_grad():
         input_tensor = tensorFromSentence(input_lang, sentence)
@@ -209,7 +195,7 @@ decoder_optimizer = optim.SGD(decoder.parameters(), lr=learning_rate)
 train_set_split = 0.5
 training_pairs = [tensorsFromPair(pairs[i])
                   for i in range(int(len(pairs) * train_set_split))]
-train_data_loader = DataLoader(dataset=training_pairs, batch_size=1, shuffle=False)
+train_data_loader = DataLoader(dataset=training_pairs, batch_size=1, shuffle=False,)
 trainer = Seq2SeqTrainer(encoder=encoder, decoder=decoder,
                          optim_e=encoder_optimizer, optim_d=decoder_optimizer,
                          device=torch.cuda.current_device(),
@@ -218,14 +204,14 @@ trainer = Seq2SeqTrainer(encoder=encoder, decoder=decoder,
                          criterion=func.nll_loss)
 vis = visdom.Visdom(server=VISDOM_SERVER, port=VISDOM_PORT, env="Eng-Fra NMT")
 
-with TrainLoop(max_epochs=50, use_cuda=True).with_context() as loop:
+with TrainLoop(max_epochs=50).with_context() as loop:
     for epoch in loop.iter_epochs():
         for step, (input_seq, target_seq) in loop.iter_steps(train_data_loader):
             loss = trainer.step(input_seq.squeeze(0), target_seq.squeeze(0))
             loop.submit_metric("train_loss", loss)
-        epochs, train_loss = loop.get_metric_by_name("train_loss")
+        train_loss = loop.get_metric("train_loss", epoch=epoch)
 
-        vis.line(X=np.asarray(epochs)[-1:], Y=np.sum(train_loss, -1)[-1:],
+        vis.line(X=np.asarray([epoch]), Y=np.asarray([sum(train_loss)]),
                  opts=dict(legend=["Train Loss"], title="Loss"),
                  win="seq2seq training", update="append" if epoch > 1 else False, )
 
@@ -233,7 +219,7 @@ torch.save(encoder.state_dict(), os.path.expanduser("~/experiments/Imp/seq2seq/s
 torch.save(decoder.state_dict(), os.path.expanduser("~/experiments/Imp/seq2seq/seq2seq_decoder_state_dict.pkl"))
 
 test_pairs = pairs[len(training_pairs):]
-with TestLoop(use_cuda=True).with_context() as test_loop:
+with TestLoop().with_context() as test_loop:
     for _, (x, y) in test_loop.iter_steps(test_pairs[:100]):
         # print('>', x)
         # print('=', y)
@@ -244,7 +230,7 @@ with TestLoop(use_cuda=True).with_context() as test_loop:
         # print('')
 
 fig = plt.figure(figsize=(5, 3), dpi=326)
-sns.distplot(test_loop.get_metric_by_name("BLEU"),
+sns.distplot(test_loop.get_metric("BLEU", step="all"),
              hist_kws=dict(cumulative=True),
              kde_kws=dict(cumulative=True))
 vis.matplot(fig, opts=dict(title="BLEU dist"), win="seq2seq evaluation")
