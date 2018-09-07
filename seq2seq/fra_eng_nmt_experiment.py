@@ -16,6 +16,7 @@ def fra_eng_nmt(hidden_size, embedding_size, n_layers,
                 learning_rate, name,
                 reverse_input,
                 max_steps,
+                dropout_p,
                 decoder_cls, load=False,
                 encoder_save_file=None, decoder_save_file=None, *args, **kwargs):
     encoder = EncoderSeq(input_size=input_lang.n_words,
@@ -26,7 +27,7 @@ def fra_eng_nmt(hidden_size, embedding_size, n_layers,
     decoder = eval(decoder_cls)(output_size=output_lang.n_words,
                                 hidden_size=hidden_size,
                                 embedding_size=embedding_size,
-                                n_layers=n_layers, ).cuda()
+                                n_layers=n_layers, dropout_p=dropout_p).cuda()
 
     encoder_optimizer = optim.SGD(encoder.parameters(), lr=learning_rate)
     decoder_optimizer = optim.SGD(decoder.parameters(), lr=learning_rate)
@@ -51,8 +52,8 @@ def fra_eng_nmt(hidden_size, embedding_size, n_layers,
     if not load:
         with TrainLoop(max_steps=max_steps, disp_step_freq=500).with_context() as loop:
             for epoch in loop.iter_epochs():
-                e_scheduler.step()
-                d_scheduler.step()
+                # e_scheduler.step()
+                # d_scheduler.step()
                 for step, (input_seq, target_seq) in loop.iter_steps(train_data_loader):
                     loss = trainer.step(input_seq.squeeze(0), target_seq.squeeze(0))
                     loop.submit_metric("train_loss", loss)

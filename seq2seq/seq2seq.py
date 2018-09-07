@@ -4,6 +4,8 @@ import torch
 from torch import nn, optim
 import torch.nn.functional as func
 
+MAX_LENGTH = 25
+
 
 class EncoderSeq(nn.Module):
     def __init__(self, input_size: int, hidden_size: int, embedding_size: int, *,
@@ -43,7 +45,7 @@ class EncoderSeq(nn.Module):
 
 class DecoderSeq(nn.Module):
     def __init__(self, hidden_size: int, output_size: int, embedding_size: int, *,
-                 n_layers: int = 1, dropout_p: float=0.5):
+                 n_layers: int = 1, dropout_p: float = 0.5):
         super().__init__()
         self.embedding_size = embedding_size
         self.n_layers = n_layers
@@ -165,7 +167,7 @@ class LuongGlobalAttentionDecoderSeq(DecoderSeq):
         return output, hidden
 
     def __init__(self, hidden_size: int, output_size: int, embedding_size: int, *,
-                 n_layers: int = 1, dropout_p: float=0.5):
+                 n_layers: int = 1, dropout_p: float = 0.5):
         super().__init__(hidden_size, output_size, embedding_size,
                          n_layers=n_layers)
         self.attn = nn.Linear(2 * hidden_size, 1, bias=False)
@@ -179,7 +181,7 @@ class LuongGlobalAttentionDecoderSeq(DecoderSeq):
 
 class BahdanauAttentionDecoderSeq(DecoderSeq):
     def __init__(self, hidden_size: int, output_size: int, embedding_size: int,
-                 n_layers: int=1, dropout_p: float=0.5):
+                 n_layers: int = 1, dropout_p: float = 0.5):
         super().__init__(hidden_size=hidden_size, output_size=output_size,
                          embedding_size=embedding_size,
                          n_layers=n_layers, dropout_p=dropout_p)
@@ -224,8 +226,8 @@ class BahdanauAttentionDecoderSeq(DecoderSeq):
         assert context_vector.size() == (target_sequence_length, 1, self.hidden_size)
         assert context_vector.size() == embedded.size()
 
-        output = self.attn_combine(torch.cat([context_vector, embedded], dim=-1))
-        rnn_outputs, hidden = self.rnn(output, hidden)
+        rnn_input = self.attn_combine(torch.cat([context_vector, embedded], dim=-1))
+        rnn_outputs, hidden = self.rnn(rnn_input, hidden)
         output = self.out(rnn_outputs)
         output = output.squeeze(1)  # in shape [seq_length, output_size]
         if len(x.size()) == 1:
@@ -233,7 +235,72 @@ class BahdanauAttentionDecoderSeq(DecoderSeq):
         return output, hidden
 
 
+class AttentionDecoderSeq(DecoderSeq):
+    """
+    Attention Mechanism following
+    [a pytorch tutorial](https://pytorch.org/tutorials/intermediate/seq2seq_translation_tutorial.html)
+    """
+    def __init__(self, hidden_size: int, output_size: int, embedding_size: int,
+                 n_layers: int = 1, dropout_p: float = 0.5,
+                 max_length=MAX_LENGTH):
+        super().__init__(hidden_size=hidden_size, output_size=output_size,
+                         embedding_size=embedding_size,
+                         n_layers=n_layers, dropout_p=dropout_p)
+        self.max_length = max_length
+        self.embedding = nn.Embedding(output_size, hidden_size)
+        self.attn = nn.Linear(2 * hidden_size, max_length)
+        self.attn_combine = nn.Linear(2 * hidden_size, hidden_size)
+        self.rnn = nn.GRU(hidden_size, hidden_size)
+        self.out = nn.Sequential(
+            nn.Linear(self.hidden_size, self.output_size),
+            nn.LogSoftmax(dim=-1)
+        )
 
+    def forward(self, x, hidden=None, **kwargs):
+        assert "encoder_outputs" in kwargs, \
+            f"encoder_outputs are missing for {self.__class__}"
+        encoder_outputs = kwargs["encoder_outputs"]
+        if len(x.size()) == 2:
+            seq_length = x.size(0)
+        elif len(x.size()) <= 1:
+            seq_length = 1
+        else:
+            raise ValueError(f"Input x has invalid shape: {x.size()}")
+        assert len(encoder_outputs.size()) == 2 and encoder_outputs.size(1) == self.hidden_size, \
+            f"encoder_outputs should in shape (input_sequence_length, hidden_size, \
+            but in {encoder_outputs.size()} now)"
+        batch_size = 1
+        source_sequence_length = encoder_outputs.size(0)
+        assert source_sequence_length <= self.max_length
+        encoder_outputs = func.pad(encoder_outputs,
+                                   (0, 0, 0, self.max_length - source_sequence_length))
+        source_sequence_length = self.max_length
+        assert encoder_outputs.size() == (self.max_length, self.hidden_size)
+        target_sequence_length = seq_length
+        embedded = self.embedding(x).view(seq_length, batch_size, -1)
+        embedded = self.input_dropout(embedded)  # (st, 1, hidden_size)
+        assert hidden.size() == (self.n_layers, batch_size, self.hidden_size)
+        cat = torch.cat([
+            embedded,
+            hidden[0].unsqueeze(0).expand(target_sequence_length, -1, -1),
+        ], dim=-1)
+        assert cat.size() == (target_sequence_length, batch_size, self.hidden_size * 2)
+        attn_weights = self.attn(cat)
+        attn_weights = func.softmax(attn_weights, dim=-1)
+        assert attn_weights.size() == \
+            (target_sequence_length, batch_size, source_sequence_length)
+        context_vector = attn_weights @ encoder_outputs
+        assert context_vector.size() == (target_sequence_length, batch_size, self.hidden_size)
+        assert context_vector.size() == embedded.size()
+
+        rnn_input = self.attn_combine(torch.cat([context_vector, embedded], dim=-1))
+        rnn_input = func.relu(rnn_input)
+        rnn_outputs, hidden = self.rnn(rnn_input, hidden)
+        output = self.out(rnn_outputs)
+        output = output.squeeze(1)  # in shape [seq_length, output_size]
+        if len(x.size()) == 1:
+            output = output.squeeze(0)  # in shape [output_size]
+        return output, hidden
 
 
 class Seq2SeqTrainer(object):
@@ -243,7 +310,7 @@ class Seq2SeqTrainer(object):
                  device: Union[int, str] = "cpu",
                  eos_token: int = 1, sos_token: int = 0,
                  teach_forcing_prob: float = 0.5,
-                 clip_grad_norm: float=5.0):
+                 clip_grad_norm: float = 5.0):
         self.clip_grad_norm = clip_grad_norm
         self.teach_forcing_prob = teach_forcing_prob
         self.device = device
@@ -269,6 +336,7 @@ class Seq2SeqTrainer(object):
             encoder_output, encoder_hidden = self.encoder(input_tensor[ei], encoder_hidden)
             encoder_outputs[ei] = encoder_output
 
+        # noinspection PyCallingNonCallable
         sos_tensor = torch.tensor([[self.sos_token]], device=self.device)
         decoder_hidden = encoder_hidden
 

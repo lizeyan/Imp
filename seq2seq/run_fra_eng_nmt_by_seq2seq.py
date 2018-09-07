@@ -18,6 +18,7 @@ def config():
     load = False
     reverse_input = True
     max_steps = 150000
+    dropout_p = 0.1
 
 
 @ex.automain

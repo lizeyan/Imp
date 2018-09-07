@@ -5,7 +5,7 @@ import tempfile
 from config import init_sacred
 from fra_eng_nmt_experiment import fra_eng_nmt
 
-ex = init_sacred(name="Fra-Eng NMT by Luong Global Attention Seq2Seq")
+ex = init_sacred(name="Fra-Eng NMT by Attention Seq2Seq")
 
 
 # noinspection PyUnusedLocal
@@ -13,12 +13,12 @@ ex = init_sacred(name="Fra-Eng NMT by Luong Global Attention Seq2Seq")
 def config():
     hidden_size = 256
     learning_rate = 0.01
-    decoder_cls = "GlobalAttentionDecoderSeq"
+    decoder_cls = "AttentionDecoderSeq"
     embedding_size = 256
     n_layers = 1
     load = False
     reverse_input = False
-    max_steps = 150000
+    max_steps = 75000
     dropout_p = 0.1
 
 

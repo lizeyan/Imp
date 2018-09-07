@@ -17,8 +17,9 @@ def config():
     embedding_size = 256
     n_layers = 1
     load = False
-    reverse_input = True
-    max_steps = 150000
+    reverse_input = False
+    max_steps = 75000
+    dropout_p = 0.1
 
 
 @ex.automain

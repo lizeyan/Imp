@@ -503,6 +503,7 @@ def indexesFromSentence(lang, sentence):
 def tensorFromSentence(lang, sentence):
     indexes = indexesFromSentence(lang, sentence)
     indexes.append(EOS_token)
+    # noinspection PyCallingNonCallable
     return torch.tensor(indexes, dtype=torch.long, device=device).view(-1, 1)
 
 

@@ -123,6 +123,7 @@ def indexesFromSentence(lang, sentence):
 def tensorFromSentence(lang, sentence):
     indexes = indexesFromSentence(lang, sentence)
     indexes.append(EOS_token)
+    # noinspection PyCallingNonCallable
     return torch.tensor(indexes, dtype=torch.long, device=device).view(-1, 1)
 
 
@@ -160,6 +161,7 @@ def evaluate(_encoder, _decoder, sentence, max_length=MAX_LENGTH):
             encoder_output, encoder_hidden = _encoder(input_tensor[ei],
                                                       encoder_hidden)
             encoder_outputs[ei] = encoder_output
+        # noinspection PyCallingNonCallable
         decoder_input = torch.tensor([[SOS_token]], device=torch.cuda.current_device())  # SOS
 
         decoder_hidden = encoder_hidden
