@@ -4,7 +4,7 @@
     <inspection_tool class="PyPackageRequirementsInspection" enabled="true" level="WARNING" enabled_by_default="true">
       <option name="ignoredPackages">
         <value>
-          <list size="8">
+          <list size="9">
             <item index="0" class="java.lang.String" itemvalue="click" />
             <item index="1" class="java.lang.String" itemvalue="numpy" />
             <item index="2" class="java.lang.String" itemvalue="torch" />
@@ -13,6 +13,7 @@
             <item index="5" class="java.lang.String" itemvalue="nltk" />
             <item index="6" class="java.lang.String" itemvalue="PIL" />
             <item index="7" class="java.lang.String" itemvalue="torchvision" />
+            <item index="8" class="java.lang.String" itemvalue="sacred" />
           </list>
         </value>
       </option>
@@ -21,6 +22,7 @@
       <option name="ignoredErrors">
         <list>
           <option value="N802" />
+          <option value="N812" />
         </list>
       </option>
     </inspection_tool>
@@ -33,6 +35,7 @@
           <option value="torch.float32" />
           <option value="torch.long" />
           <option value="torch.zeros" />
+          <option value="torch.flip" />
         </list>
       </option>
     </inspection_tool>

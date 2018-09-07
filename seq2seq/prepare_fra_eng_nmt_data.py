@@ -1,29 +1,15 @@
 from __future__ import unicode_literals, print_function, division
-from io import open
-import unicodedata
-import os
-import re
-import random
-import time
-import math
-import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
-import numpy as np
-import torch
-import seaborn as sns
-import torch.nn as nn
-import visdom
-from nltk.translate.bleu_score import sentence_bleu
-from torch import optim
-import torch.nn.functional as func
-from torch.utils.data import DataLoader
 
-from config import VISDOM_SERVER, VISDOM_PORT
-from seq2seq import EncoderSeq, DecoderSeq, Seq2SeqTrainer
-from snippets.scaffold import TrainLoop, TestLoop
+import math
+import random
+import re
+import time
+import unicodedata
+from io import open
+
+import torch
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 SOS_token = 0
 EOS_token = 1
 
@@ -168,69 +154,22 @@ def evaluate(_encoder, _decoder, sentence, max_length=MAX_LENGTH):
         input_tensor = tensorFromSentence(input_lang, sentence)
         input_length = input_tensor.size()[0]
         encoder_hidden = None
+        encoder_outputs = torch.zeros(input_length, _encoder.hidden_size,
+                                      device=input_tensor.device)
         for ei in range(input_length):
             encoder_output, encoder_hidden = _encoder(input_tensor[ei],
                                                       encoder_hidden)
+            encoder_outputs[ei] = encoder_output
         decoder_input = torch.tensor([[SOS_token]], device=torch.cuda.current_device())  # SOS
 
         decoder_hidden = encoder_hidden
 
         decoded_words = []
-        decoded_outputs = _decoder.forward_n(decoder_input, decoder_hidden, n_steps=max_length, stop_token=EOS_token)
+        decoded_outputs = _decoder.forward_n(decoder_input, decoder_hidden,
+                                             n_steps=max_length, stop_token=EOS_token,
+                                             encoder_outputs=encoder_outputs,
+                                             trim=True)
         for output in decoded_outputs:
             _, top_index = output.topk(1)
             decoded_words.append(output_lang.index2word[top_index.item()])
         return decoded_words
-
-
-hidden_size = 256
-learning_rate = 1e-2
-
-encoder = EncoderSeq(input_size=input_lang.n_words, hidden_size=hidden_size).cuda()
-decoder = DecoderSeq(output_size=output_lang.n_words, hidden_size=hidden_size).cuda()
-
-encoder_optimizer = optim.SGD(encoder.parameters(), lr=learning_rate)
-decoder_optimizer = optim.SGD(decoder.parameters(), lr=learning_rate)
-
-train_set_split = 0.5
-training_pairs = [tensorsFromPair(pairs[i])
-                  for i in range(int(len(pairs) * train_set_split))]
-train_data_loader = DataLoader(dataset=training_pairs, batch_size=1, shuffle=False,)
-trainer = Seq2SeqTrainer(encoder=encoder, decoder=decoder,
-                         optim_e=encoder_optimizer, optim_d=decoder_optimizer,
-                         device=torch.cuda.current_device(),
-                         eos_token=EOS_token, sos_token=SOS_token,
-                         teach_forcing_prob=0.5,
-                         criterion=func.nll_loss)
-vis = visdom.Visdom(server=VISDOM_SERVER, port=VISDOM_PORT, env="Eng-Fra NMT")
-
-with TrainLoop(max_epochs=50).with_context() as loop:
-    for epoch in loop.iter_epochs():
-        for step, (input_seq, target_seq) in loop.iter_steps(train_data_loader):
-            loss = trainer.step(input_seq.squeeze(0), target_seq.squeeze(0))
-            loop.submit_metric("train_loss", loss)
-        train_loss = loop.get_metric("train_loss", epoch=epoch)
-
-        vis.line(X=np.asarray([epoch]), Y=np.asarray([sum(train_loss)]),
-                 opts=dict(legend=["Train Loss"], title="Loss"),
-                 win="seq2seq training", update="append" if epoch > 1 else False, )
-
-torch.save(encoder.state_dict(), os.path.expanduser("~/experiments/Imp/seq2seq/seq2seq_encoder_state_dict.pkl"))
-torch.save(decoder.state_dict(), os.path.expanduser("~/experiments/Imp/seq2seq/seq2seq_decoder_state_dict.pkl"))
-
-test_pairs = pairs[len(training_pairs):]
-with TestLoop().with_context() as test_loop:
-    for _, (x, y) in test_loop.iter_steps(test_pairs[:100]):
-        # print('>', x)
-        # print('=', y)
-        output_words = evaluate(encoder, decoder, x)
-        output_sentence = ' '.join(output_words)
-        test_loop.submit_metric("BLEU", sentence_bleu([y.split(" ")], output_sentence.split(" ")))
-        # print('<', output_sentence)
-        # print('')
-
-fig = plt.figure(figsize=(5, 3), dpi=326)
-sns.distplot(test_loop.get_metric("BLEU", step="all"),
-             hist_kws=dict(cumulative=True),
-             kde_kws=dict(cumulative=True))
-vis.matplot(fig, opts=dict(title="BLEU dist"), win="seq2seq evaluation")
