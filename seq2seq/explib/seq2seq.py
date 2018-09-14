@@ -22,19 +22,24 @@ class EncoderSeq(nn.Module):
 
     def forward(self, x, hidden=None):
         """
-        :param x: A Tensor in shape (seq_length, 1, ) or (1, )
+        :param x: A tensor in shape (seq_length, batch_size, )
+                                  or (seq_length,),
+                    or just a scalar tensor
         :param hidden: Corresponding hidden state, keeping it None will use new hidden state
         :return:
         """
-        if len(x.size()) == 2:
+        if len(x.size()) == 2:  # in shape (seq_length, batch_size)
+            batch_size = x.size(1)
             seq_length = x.size(0)
-        elif len(x.size()) <= 1:
-            seq_length = 1
+        elif len(x.size()) == 1:
+            seq_length = x.size(0)
+            batch_size = 1
         else:
-            raise ValueError(f"Input x has invalid shape: {x.size()}")
+            seq_length = 1
+            batch_size = 1
         if self.reverse_input:
             x = torch.flip(x, dims=(0,))
-        embedded = self.embedding(x).view(seq_length, 1, -1)
+        embedded = self.embedding(x).view(seq_length, batch_size, -1)
         output, hidden = self.rnn(embedded, hidden)
 
         output = output.squeeze(1)
