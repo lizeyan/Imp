@@ -36,8 +36,8 @@ def fra_eng_nmt(*,
 
     encoder_optimizer = optim.SGD(encoder.parameters(), lr=learning_rate)
     decoder_optimizer = optim.SGD(decoder.parameters(), lr=learning_rate)
-    e_scheduler = StepLR(encoder_optimizer, step_size=5, gamma=0.75)
-    d_scheduler = StepLR(decoder_optimizer, step_size=5, gamma=0.75)
+    # e_scheduler = StepLR(encoder_optimizer, step_size=10, gamma=0.9)
+    # d_scheduler = StepLR(decoder_optimizer, step_size=10, gamma=0.9)
 
     train_data_loader = DataLoader(dataset=train_dataset, pin_memory=True,
                                    batch_size=batch_size, shuffle=True,
@@ -50,7 +50,7 @@ def fra_eng_nmt(*,
         encoder.load_state_dict(torch.load(encoder_load_file))
     if decoder_load_file:
         decoder.load_state_dict(torch.load(decoder_load_file))
-    with TrainLoop(max_steps=max_steps, disp_step_freq=500).with_context() as loop:
+    with TrainLoop(max_steps=max_steps, disp_step_freq=500, disp_epoch_freq=None).with_context() as loop:
         for _ in loop.iter_epochs():
             # e_scheduler.step()
             # d_scheduler.step()

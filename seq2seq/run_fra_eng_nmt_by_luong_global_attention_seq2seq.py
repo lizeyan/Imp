@@ -2,7 +2,7 @@ from config import init_sacred
 from explib.fra_eng_nmt_experiment import fra_eng_nmt, EncoderSeq
 import tempfile
 
-ex = init_sacred(name="Fra-Eng NMT by Seq2Seq")
+ex = init_sacred(name="Fra-Eng NMT by Luong Global Attention Seq2Seq")
 
 
 # noinspection PyUnusedLocal
@@ -10,7 +10,7 @@ ex = init_sacred(name="Fra-Eng NMT by Seq2Seq")
 def experiment_config():
     hidden_size = 256
     learning_rate = 0.1
-    decoder_cls = "DecoderSeq"
+    decoder_cls = "LuongGlobalAttentionDecoderSeq"
     embedding_size = 256
     n_layers = 1
     reverse_input = True
