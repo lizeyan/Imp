@@ -4,7 +4,7 @@ from torch.optim.lr_scheduler import *
 from torch.utils.data import DataLoader
 
 from explib.prepare_fra_eng_nmt_data import prepareData
-from snippets.modules import *
+from snippets.modules.sequence import *
 from snippets.scaffold import TrainLoop, TestLoop
 
 

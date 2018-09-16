@@ -44,6 +44,7 @@
           <option value="torch.zeros" />
           <option value="torch.flip" />
           <option value="torch.sum" />
+          <option value="torch.randint" />
         </list>
       </option>
     </inspection_tool>
