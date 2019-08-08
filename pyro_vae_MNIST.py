@@ -148,7 +148,7 @@ def main_test_mnist():
         logger.info(
             f"epoch:{engine.state.epoch}, ELBO: {elbo:.2f}, step time: {timer.value():.3f}s"
         )
-        vis.line(Y=[elbo], X=[engine.state.epoch], win="Train-ELBO", update='append')
+        vis.line(Y=[elbo], X=[engine.state.epoch], win="Train-ELBO", update='append', opts={"title": "Train-ELBO"})
 
     def plot_vae_samples(title):
         x = torch.zeros([1, 784]).to(vae.device)
@@ -175,7 +175,7 @@ def main_test_mnist():
             evaluater.run(test_dataloader)
             elbo = evaluater.state.metrics['ELBO']
             logger.info(f"epoch: {epoch}, validation ELBO: {elbo}")
-            vis.line(Y=[elbo], X=[engine.state.epoch], win="Validation-ELBO", update='append')
+            vis.line(Y=[elbo], X=[engine.state.epoch], win="Validation-ELBO", update='append', opts={'title': "Validation-ELBO"})
 
     trainer.run(train_dataloader, max_epochs=2500)
 
