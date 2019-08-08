@@ -72,8 +72,9 @@ class VAE(nn.Module):
             z_loc = torch.zeros(batch_size, self.z_dim, device=self.device)
             z_scale = torch.ones(batch_size, self.z_dim, device=self.device)
             z = pyro.sample('latent', dist.Normal(z_loc, z_scale).to_event(1))
-            x_loc, x_scale = self.decoder(z)
-            x = pyro.sample('obs', dist.Normal(x_loc, x_scale).to_event(1))
+            x_loc, _ = self.decoder(z)
+            x_loc = torch.sigmoid(x_loc)
+            x = pyro.sample('obs', dist.Bernoulli(x_loc).to_event(1))
             return x_loc
 
     def model(self, x: torch.Tensor):
@@ -139,7 +140,7 @@ def main_test_mnist():
     loss_metric = RunningAverage(output_transform=lambda outputs: -outputs[0], alpha=1)
     loss_metric.attach(engine=trainer, name="ELBO")
     loss_metric.attach(engine=evaluater, name="ELBO")
-    vis = Visdom(server="gpu1.cluster.peidan.me", port=10697, env='TraceAnalysis-VAE-Test')
+    vis = Visdom(server="gpu1.cluster.peidan.me", port=10697, env='Imp-pyro--vae-MNIST')
 
     @trainer.on(Events.EPOCH_COMPLETED)
     def log_train_loss(engine):
@@ -176,7 +177,7 @@ def main_test_mnist():
             logger.info(f"epoch: {epoch}, validation ELBO: {elbo}")
             vis.line(Y=[elbo], X=[engine.state.epoch], win="Validation-ELBO", update='append')
 
-    trainer.run(train_dataloader, max_epochs=101)
+    trainer.run(train_dataloader, max_epochs=2500)
 
 
 if __name__ == '__main__':
